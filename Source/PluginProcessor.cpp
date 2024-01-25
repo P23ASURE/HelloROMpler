@@ -1,10 +1,3 @@
-/*
-  ==============================================================================
-
-    This file contains the basic framework code for a JUCE plugin processor.
-
-  ==============================================================================
-*/
 
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
@@ -12,14 +5,22 @@
 //==============================================================================
 HelloROMplerAudioProcessor::HelloROMplerAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
-     : AudioProcessor (BusesProperties()
-                     #if ! JucePlugin_IsMidiEffect
-                      #if ! JucePlugin_IsSynth
-                       .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
-                      #endif
-                       .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
-                     #endif
-                       )
+    : AudioProcessor(BusesProperties()
+#if ! JucePlugin_IsMidiEffect
+#if ! JucePlugin_IsSynth
+        .withInput("Input", juce::AudioChannelSet::stereo(), true)
+#endif
+        .withOutput("Output", juce::AudioChannelSet::stereo(), true)
+#endif
+    ),
+    parameters(*this, nullptr, "PARAMETERS",
+        {
+            std::make_unique<juce::AudioParameterFloat>("attack", "Attack", 0.1f, 5000.0f, 0.1f),
+            std::make_unique<juce::AudioParameterFloat>("decay", "Decay", 0.1f, 2000.0f, 0.1f),
+            std::make_unique<juce::AudioParameterFloat>("sustain", "Sustain", 0.0f, 1.0f, 0.8f),
+            std::make_unique<juce::AudioParameterFloat>("release", "Release", 0.1f, 5000.0f, 0.1f)
+
+        })
 #endif
 {
     formatManager.registerBasicFormats();
@@ -29,9 +30,15 @@ HelloROMplerAudioProcessor::HelloROMplerAudioProcessor()
         mySampler.addVoice(std::make_unique<juce::SamplerVoice>().release());
     }
 
-
     loadSamplesFromROM();
+
+    adsrParams.attack = *parameters.getRawParameterValue("attack");
+    adsrParams.decay = *parameters.getRawParameterValue("decay");
+    adsrParams.sustain = *parameters.getRawParameterValue("sustain");
+    adsrParams.release = *parameters.getRawParameterValue("release");
+    adsr.setParameters(adsrParams);
 }
+
 
 HelloROMplerAudioProcessor::~HelloROMplerAudioProcessor()
 {
@@ -57,16 +64,17 @@ void HelloROMplerAudioProcessor::selectSample(int index) {
 void HelloROMplerAudioProcessor::loadSamplesFromROM() {
     juce::File appDirectory = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
     juce::File romDirectory = appDirectory.getChildFile("Resources/ROM");
-    sampleFiles.clear();  // Pulire l'array prima di popolarlo
+    sampleFiles.clear();  // Clean array
     romDirectory.findChildFiles(sampleFiles, juce::File::findFiles, false, "*.wav");
 
     if (!sampleFiles.isEmpty()) {
-        selectSample(0);  // Seleziona il primo campione per default
+        selectSample(0);  // Load first sample as default
     }
     else {
         DBG("No .wav files found in " << romDirectory.getFullPathName());
     }
 }
+
 //==============================================================================
 const juce::String HelloROMplerAudioProcessor::getName() const
 {
@@ -133,7 +141,8 @@ void HelloROMplerAudioProcessor::changeProgramName (int index, const juce::Strin
 void HelloROMplerAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     mySampler.setCurrentPlaybackSampleRate(sampleRate);
-
+    adsr.setSampleRate(sampleRate);
+    adsrValues.resize(samplesPerBlock);
 }
 
 void HelloROMplerAudioProcessor::releaseResources()
@@ -164,40 +173,72 @@ bool HelloROMplerAudioProcessor::isBusesLayoutSupported (const BusesLayout& layo
 }
 #endif
 
-void HelloROMplerAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
-    juce::MidiBuffer& midiMessages)
-{
+void HelloROMplerAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
+    // Clear any unused channels
+    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
         buffer.clear(i, 0, buffer.getNumSamples());
-
-    juce::MidiMessage m;
-    juce::MidiBuffer::Iterator it{ midiMessages };
-    int sample;
-
-    while (it.getNextEvent(m, sample))
-    {
-        if (m.isNoteOn())
-            isNotePlayed = true;
-        else if (m.isNoteOff())
-            isNotePlayed = false;
     }
 
-    sampleCount = isNotePlayed ? sampleCount += buffer.getNumSamples() : 0;
+    updateADSRIfNecessary();
 
-    mySampler.renderNextBlock(buffer,
-        midiMessages,
-        0,
-        buffer.getNumSamples());
+    mySampler.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
 
-    for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
-    {
-        // 
+    // Handle MIDI events and apply the ADSR
+    for (const auto metadata : midiMessages) {
+        const auto msg = metadata.getMessage();
+        if (msg.isNoteOn()) {
+            adsr.noteOn();
+        }
+        else if (msg.isNoteOff()) {
+            adsr.noteOff();
+        }
+    }
+
+    // Ensure adsrValues vector is correctly sized 
+    if (adsrValues.size() != buffer.getNumSamples()) {
+        adsrValues.resize(buffer.getNumSamples());
+    }
+
+    // Pre-buffer ADSR values
+    for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
+        adsrValues[sample] = adsr.getNextSample();
+    }
+
+    // Apply pre-buffered ADSR values to every buffer sample across all channels
+    for (int channel = 0; channel < totalNumOutputChannels; ++channel) {
+        auto* channelData = buffer.getWritePointer(channel);
+        for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
+            channelData[sample] *= adsrValues[sample];
+        }
     }
 }
+
+
+void HelloROMplerAudioProcessor::updateADSRIfNecessary() {
+    // Bring new values
+    auto newAttack = parameters.getRawParameterValue("attack")->load() / 1000.0f; // Convert to seconds
+    auto newDecay = parameters.getRawParameterValue("decay")->load() / 1000.0f; // Convert to seconds
+    auto newSustain = parameters.getRawParameterValue("sustain")->load(); 
+    auto newRelease = parameters.getRawParameterValue("release")->load() / 1000.0f; // Convert to seconds
+
+    // check parameter changes
+    if (newAttack != adsrParams.attack || newDecay != adsrParams.decay ||
+        newSustain != adsrParams.sustain || newRelease != adsrParams.release) {
+
+        // updating new paramiters
+        adsrParams.attack = newAttack;
+        adsrParams.decay = newDecay;
+        adsrParams.sustain = newSustain;
+        adsrParams.release = newRelease;
+
+        adsr.setParameters(adsrParams);
+    }
+}
+
 
 //==============================================================================
 bool HelloROMplerAudioProcessor::hasEditor() const

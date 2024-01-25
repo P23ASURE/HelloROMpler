@@ -2,20 +2,21 @@
 #include "PluginEditor.h"
 
 //==============================================================================
-HelloROMplerAudioProcessorEditor::HelloROMplerAudioProcessorEditor (HelloROMplerAudioProcessor& p)
-    : AudioProcessorEditor (&p), audioProcessor (p)
-{
+HelloROMplerAudioProcessorEditor::HelloROMplerAudioProcessorEditor(HelloROMplerAudioProcessor& p)
+    : AudioProcessorEditor(&p), audioProcessor(p), adsrComponent(p.parameters) {
+    // ComboBox
     addAndMakeVisible(sampleSelectionBox);
     sampleSelectionBox.onChange = [this] { this->sampleSelectionChanged(); };
     populateSampleSelectionBox();
-    
-    setSize (700, 500);
+
+    addAndMakeVisible(adsrComponent);
+
+    setSize(700, 500);
 }
 
 HelloROMplerAudioProcessorEditor::~HelloROMplerAudioProcessorEditor()
 {
 }
-
 //==============================================================================
 
 void HelloROMplerAudioProcessorEditor::populateSampleSelectionBox() {
@@ -41,7 +42,26 @@ void HelloROMplerAudioProcessorEditor::paint (juce::Graphics& g)
     g.drawFittedText ("Hello Rompler!", getLocalBounds(), juce::Justification::centred, 1);
 }
 
-void HelloROMplerAudioProcessorEditor::resized()
-{
-    sampleSelectionBox.setBounds(10, 10, 150, 30);
+// PluginEditor.cpp
+
+void HelloROMplerAudioProcessorEditor::resized() {
+    auto area = getLocalBounds(); // Ottiene l'area totale della finestra
+
+    auto headerArea = area.removeFromTop(100); // Area dell'header per ComboBox e ADSRComponent
+
+    // Definizione delle proporzioni dell'area dell'intestazione per ComboBox e ADSRComponent
+    int comboBoxWidthProportion = 1; // Parte dell'area dell'intestazione per la ComboBox
+    int adsrWidthProportion = 3; // Parte dell'area dell'intestazione per l'ADSRComponent
+    int totalProportion = comboBoxWidthProportion + adsrWidthProportion;
+
+    // Posiziona la ComboBox
+    auto comboBoxArea = headerArea.removeFromLeft(headerArea.getWidth() * comboBoxWidthProportion / totalProportion);
+    sampleSelectionBox.setBounds(comboBoxArea.reduced(10)); // Riduci per avere un po' di margine
+
+    // Posiziona l'ADSRComponent nell'area rimanente
+    adsrComponent.setBounds(headerArea.reduced(5));
+
+    // ... logica per posizionare altri controlli se presenti ...
 }
+
+

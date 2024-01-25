@@ -1,14 +1,8 @@
-/*
-  ==============================================================================
-
-    This file contains the basic framework code for a JUCE plugin processor.
-
-  ==============================================================================
-*/
 
 #pragma once
 
 #include <JuceHeader.h>
+#include <juce_dsp/juce_dsp.h>
 
 //==============================================================================
 /**
@@ -62,10 +56,14 @@ public:
     
     void selectSample(int index);
     const juce::Array<juce::File>& getSampleFiles() const { return sampleFiles; }
-
+    juce::AudioProcessorValueTreeState parameters;
+    void updateADSRIfNecessary();
 private:
+    juce::ADSR adsr;
+    juce::ADSR::Parameters adsrParams;
+    std::vector<float> adsrValues;
+    
     void loadSamplesFromROM();
-
     juce::Array<juce::File> sampleFiles;
 
     juce::Synthesiser mySampler;
