@@ -21,6 +21,10 @@ public:
     void populateSampleSelectionBox();
     void sampleSelectionChanged();
 private:
+    juce::Slider gainSlider; 
+    juce::Label gainLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> gainAttachment;
+
     ADSRComponent adsrComponent;
 
     // ADSR Slider & Label

@@ -4,10 +4,28 @@
 //==============================================================================
 HelloROMplerAudioProcessorEditor::HelloROMplerAudioProcessorEditor(HelloROMplerAudioProcessor& p)
     : AudioProcessorEditor(&p), audioProcessor(p), adsrComponent(p.parameters) {
+    // Configure the gain slider
+    gainSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    gainSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    gainSlider.setRange(0.0, 1.0, 1.0);
+    addAndMakeVisible(gainSlider);
+
+    // Configure the gain label
+    gainLabel.setText("Gain", juce::dontSendNotification);
+    gainLabel.attachToComponent(&gainSlider, true);
+    addAndMakeVisible(gainLabel);
+
+    // Attach the slider to the gain parameter
+    gainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.parameters, "gain", gainSlider);
+
     // ComboBox
     addAndMakeVisible(sampleSelectionBox);
     sampleSelectionBox.onChange = [this] { this->sampleSelectionChanged(); };
     populateSampleSelectionBox();
+    int currentSampleIndex = audioProcessor.getCurrentSampleIndex();
+    if (currentSampleIndex >= 0 && currentSampleIndex < sampleSelectionBox.getNumItems()) {
+        sampleSelectionBox.setSelectedItemIndex(currentSampleIndex, juce::dontSendNotification);
+    }
 
     addAndMakeVisible(adsrComponent);
 
@@ -42,26 +60,35 @@ void HelloROMplerAudioProcessorEditor::paint (juce::Graphics& g)
     g.drawFittedText ("Hello Rompler!", getLocalBounds(), juce::Justification::centred, 1);
 }
 
-// PluginEditor.cpp
-
 void HelloROMplerAudioProcessorEditor::resized() {
-    auto area = getLocalBounds(); // Ottiene l'area totale della finestra
+    auto area = getLocalBounds();
+    auto headerArea = area.removeFromTop(100);
+    int comboBoxWidthProportion = 1;
+    int adsrWidthProportion = 4;
+    int gainWidthProportion = 1;
+    int totalProportion = comboBoxWidthProportion + adsrWidthProportion + gainWidthProportion;
 
-    auto headerArea = area.removeFromTop(100); // Area dell'header per ComboBox e ADSRComponent
-
-    // Definizione delle proporzioni dell'area dell'intestazione per ComboBox e ADSRComponent
-    int comboBoxWidthProportion = 1; // Parte dell'area dell'intestazione per la ComboBox
-    int adsrWidthProportion = 3; // Parte dell'area dell'intestazione per l'ADSRComponent
-    int totalProportion = comboBoxWidthProportion + adsrWidthProportion;
-
-    // Posiziona la ComboBox
+    // ComboBox Area
     auto comboBoxArea = headerArea.removeFromLeft(headerArea.getWidth() * comboBoxWidthProportion / totalProportion);
-    sampleSelectionBox.setBounds(comboBoxArea.reduced(10)); // Riduci per avere un po' di margine
+    sampleSelectionBox.setBounds(comboBoxArea.reduced(10));
 
-    // Posiziona l'ADSRComponent nell'area rimanente
-    adsrComponent.setBounds(headerArea.reduced(5));
+    // ADSR Component Area
+    auto adsrArea = headerArea.removeFromLeft(headerArea.getWidth() * adsrWidthProportion / totalProportion);
+    adsrComponent.setBounds(adsrArea.reduced(5));
 
-    // ... logica per posizionare altri controlli se presenti ...
+    // Gain Area (now further to the right)
+    auto gainArea = headerArea; // Use the remaining area for the gain
+
+    // Gain Slider Area
+    auto sliderHeight = gainArea.proportionOfHeight(0.8); // Allocate 80% of the gain area height for the slider
+    gainSlider.setBounds(gainArea.removeFromTop(sliderHeight).reduced(10)); // Position the slider, add some padding
+
+    // Gain Label Area (below the slider)
+    // Ensure the remaining area is for the label, adjust padding if needed
+    // Check if the height is too small and adjust accordingly
+    if (gainArea.getHeight() < 20) { // Minimum height for the label
+        gainArea = gainArea.withHeight(20);
+    }
+    gainLabel.setBounds(gainArea.reduced(10, 0)); // Reduce left and right padding, but no top and bottom padding
+    gainLabel.setJustificationType(juce::Justification::centred); // Center the label text
 }
-
-

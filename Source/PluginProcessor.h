@@ -58,13 +58,18 @@ public:
     const juce::Array<juce::File>& getSampleFiles() const { return sampleFiles; }
     juce::AudioProcessorValueTreeState parameters;
     void updateADSRIfNecessary();
+    int getCurrentSampleIndex() const;
 private:
+
+    std::atomic<float>* gainParameter;
+
     juce::ADSR adsr;
     juce::ADSR::Parameters adsrParams;
     std::vector<float> adsrValues;
     
     void loadSamplesFromROM();
     juce::Array<juce::File> sampleFiles;
+    int currentSampleIndex = 0;
 
     juce::Synthesiser mySampler;
     juce::AudioFormatManager formatManager;

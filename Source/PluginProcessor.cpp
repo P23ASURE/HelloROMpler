@@ -18,7 +18,8 @@ HelloROMplerAudioProcessor::HelloROMplerAudioProcessor()
             std::make_unique<juce::AudioParameterFloat>("attack", "Attack", 0.1f, 5000.0f, 0.1f),
             std::make_unique<juce::AudioParameterFloat>("decay", "Decay", 0.1f, 2000.0f, 0.1f),
             std::make_unique<juce::AudioParameterFloat>("sustain", "Sustain", 0.0f, 1.0f, 0.8f),
-            std::make_unique<juce::AudioParameterFloat>("release", "Release", 0.1f, 5000.0f, 0.1f)
+            std::make_unique<juce::AudioParameterFloat>("release", "Release", 0.1f, 5000.0f, 0.1f),
+            std::make_unique<juce::AudioParameterFloat>("gain", "Gain", 0.0f, 1.0f, 0.5f)
 
         })
 #endif
@@ -37,6 +38,8 @@ HelloROMplerAudioProcessor::HelloROMplerAudioProcessor()
     adsrParams.sustain = *parameters.getRawParameterValue("sustain");
     adsrParams.release = *parameters.getRawParameterValue("release");
     adsr.setParameters(adsrParams);
+
+    gainParameter = parameters.getRawParameterValue("gain");
 }
 
 
@@ -47,6 +50,8 @@ HelloROMplerAudioProcessor::~HelloROMplerAudioProcessor()
 //==============================================================================
 void HelloROMplerAudioProcessor::selectSample(int index) {
     if (index >= 0 && index < sampleFiles.size()) {
+        currentSampleIndex = index; // Update the current sample index
+
         auto file = sampleFiles[index];
         std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(file));
         if (reader) {
@@ -59,6 +64,10 @@ void HelloROMplerAudioProcessor::selectSample(int index) {
             DBG("Unable to create a reader for the file: " << file.getFullPathName());
         }
     }
+}
+
+int HelloROMplerAudioProcessor::getCurrentSampleIndex() const {
+    return currentSampleIndex;
 }
 
 void HelloROMplerAudioProcessor::loadSamplesFromROM() {
@@ -208,11 +217,14 @@ void HelloROMplerAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, 
         adsrValues[sample] = adsr.getNextSample();
     }
 
-    // Apply pre-buffered ADSR values to every buffer sample across all channels
+    // Retrieve the current value of the gain parameter
+    float currentGain = *gainParameter;
+
+    // Apply pre-buffered ADSR & Gain values to every buffer sample across all channels
     for (int channel = 0; channel < totalNumOutputChannels; ++channel) {
         auto* channelData = buffer.getWritePointer(channel);
         for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
-            channelData[sample] *= adsrValues[sample];
+            channelData[sample] *= adsrValues[sample] * currentGain;
         }
     }
 }
