@@ -20,7 +20,11 @@ public:
     //==============================================================================
     void populateSampleSelectionBox();
     void sampleSelectionChanged();
+    void updateComboBoxSelection();
 private:
+    juce::TextButton nextButton;
+    juce::TextButton previousButton;
+
     juce::Slider gainSlider; 
     juce::Label gainLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> gainAttachment;

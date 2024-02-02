@@ -4,6 +4,16 @@
 //==============================================================================
 HelloROMplerAudioProcessorEditor::HelloROMplerAudioProcessorEditor(HelloROMplerAudioProcessor& p)
     : AudioProcessorEditor(&p), audioProcessor(p), adsrComponent(p.parameters) {
+    // Inizializza il pulsante "Next"
+    nextButton.setButtonText("Next");
+    nextButton.onClick = [this] { audioProcessor.nextSample(); updateComboBoxSelection(); };
+    addAndMakeVisible(nextButton);
+
+    // Inizializza il pulsante "Previous"
+    previousButton.setButtonText("Previous");
+    previousButton.onClick = [this] { audioProcessor.previousSample(); updateComboBoxSelection(); };
+    addAndMakeVisible(previousButton);
+
     // Configure the gain slider
     gainSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     gainSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
@@ -49,6 +59,13 @@ void HelloROMplerAudioProcessorEditor::sampleSelectionChanged() {
     int selectedSampleIndex = sampleSelectionBox.getSelectedItemIndex();
     audioProcessor.selectSample(selectedSampleIndex);
 }
+
+void HelloROMplerAudioProcessorEditor::updateComboBoxSelection() {
+    int currentSampleIndex = audioProcessor.getCurrentSampleIndex();
+    if (currentSampleIndex >= 0 && currentSampleIndex < sampleSelectionBox.getNumItems()) {
+        sampleSelectionBox.setSelectedItemIndex(currentSampleIndex, juce::dontSendNotification);
+    }
+}
 //==============================================================================
 void HelloROMplerAudioProcessorEditor::paint (juce::Graphics& g)
 {
@@ -59,6 +76,7 @@ void HelloROMplerAudioProcessorEditor::paint (juce::Graphics& g)
     g.setFont (15.0f);
     g.drawFittedText ("Hello Rompler!", getLocalBounds(), juce::Justification::centred, 1);
 }
+
 
 void HelloROMplerAudioProcessorEditor::resized() {
     auto area = getLocalBounds();
@@ -91,4 +109,10 @@ void HelloROMplerAudioProcessorEditor::resized() {
     }
     gainLabel.setBounds(gainArea.reduced(10, 0)); // Reduce left and right padding, but no top and bottom padding
     gainLabel.setJustificationType(juce::Justification::centred); // Center the label text
+
+    // Posiziona i pulsanti "Next" e "Previous"
+    const int buttonHeight = 30;
+    const int buttonWidth = 100;
+    nextButton.setBounds(getWidth() - buttonWidth - 10, getHeight() - buttonHeight - 10, buttonWidth, buttonHeight);
+    previousButton.setBounds(10, getHeight() - buttonHeight - 10, buttonWidth, buttonHeight);
 }

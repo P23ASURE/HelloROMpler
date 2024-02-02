@@ -59,6 +59,9 @@ public:
     juce::AudioProcessorValueTreeState parameters;
     void updateADSRIfNecessary();
     int getCurrentSampleIndex() const;
+
+    void nextSample();
+    void previousSample();
 private:
 
     std::atomic<float>* gainParameter;

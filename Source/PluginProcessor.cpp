@@ -73,7 +73,7 @@ int HelloROMplerAudioProcessor::getCurrentSampleIndex() const {
 void HelloROMplerAudioProcessor::loadSamplesFromROM() {
     juce::File appDirectory = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
     juce::File romDirectory = appDirectory.getChildFile("Resources/ROM");
-    sampleFiles.clear();  // Clean array
+    sampleFiles.clear(); 
     romDirectory.findChildFiles(sampleFiles, juce::File::findFiles, false, "*.wav");
 
     if (!sampleFiles.isEmpty()) {
@@ -84,6 +84,23 @@ void HelloROMplerAudioProcessor::loadSamplesFromROM() {
     }
 }
 
+void HelloROMplerAudioProcessor::nextSample() {
+    if (currentSampleIndex + 1 < sampleFiles.size()) {
+        selectSample(currentSampleIndex + 1);
+    }
+    else {
+        selectSample(0);
+    }
+}
+
+void HelloROMplerAudioProcessor::previousSample() {
+    if (currentSampleIndex - 1 >= 0) {
+        selectSample(currentSampleIndex - 1);
+    }
+    else {
+        selectSample(sampleFiles.size() - 1);
+    }
+}
 //==============================================================================
 const juce::String HelloROMplerAudioProcessor::getName() const
 {
